@@ -8,6 +8,8 @@ from PIL import Image
 from maad import sound
 from maad import util
 
+from mpi4py import MPI
+
 def get_spectrograms_from_file(path, window, min_freq, max_freq):
     s, fs = sound.load(path)
     slices = sound.wave2frames(s, int(fs*window))
@@ -92,13 +94,18 @@ def save_figures(path, file_name, figures):
 
 
 
-def reformat_all_files_in_dir(path, extention):
+def reformat_all_files_in_dir(path, originalfilename, extention):
     for File in os.listdir(path):
         filename = os.fsdecode(File)
-        if filename.endswith('.'+extention):
-            filepath = os.path.join(path, filename)
-            img = reformat_image(Image.open(filepath))
-            img.save(filepath)
+        # It will take only the spectrogram images with original file names 
+        # this is important for parallel computation
+        # This generates issues in parallel computation since this function could try to read files
+        # that have not been completely created yet from pair processes
+        if originalfilename==Path(filename).stem[:len(originalfilename)]:
+            if filename.endswith('.'+extention):
+                filepath = os.path.join(path, filename)
+                img = reformat_image(Image.open(filepath))
+                img.save(filepath)
 
 
 
@@ -133,7 +140,6 @@ def build_spectrogram_images_from_audio_file(audiofilepath, outputdirpath, windo
     spectrograms, slices, tn, fn, ext = get_spectrograms_from_file(audiofilepath, window_t, min_f, max_f)
     figures = get_figures_from_spectrograms(spectrograms, ext)
 
-    # You should change 'test' to your preferred folder.
     CHECK_FOLDER = os.path.isdir(outputdirpath)
 
     # If folder doesn't exist, then create it.
@@ -141,11 +147,36 @@ def build_spectrogram_images_from_audio_file(audiofilepath, outputdirpath, windo
         Path(outputdirpath).mkdir(parents=True, exist_ok=True)
 
     save_figures(outputdirpath, Path(audiofilepath).stem, figures)
-    reformat_all_files_in_dir(outputdirpath, 'png')
+    reformat_all_files_in_dir(outputdirpath, Path(audiofilepath).stem, 'png')
 
 
 
 
+
+
+def navigate_directory_tree(size, rank, input_directory, output_directory, window_t=10, min_f=0, max_f=20000):
+    """
+    Build and save spectrogram images built from audio files from directory trees
+    """
+    # iterate over files in
+    # that input_directory
+    files = [f for f in os.listdir(input_directory) if os.path.isfile(os.path.join(input_directory, f))]
+    directories = [d for d in os.listdir(input_directory) if os.path.isdir(os.path.join(input_directory, d))]
+    counter = 0
+    for filename in files:
+        if counter % size == rank:
+            print('From rank ', rank, ' From ', os.path.join(input_directory, filename))
+            print('From rank ', rank, ' To ', output_directory)
+            build_spectrogram_images_from_audio_file(os.path.join(input_directory, filename), output_directory, window_t, min_f, max_f)
+
+        counter = counter + 1
+
+    for dirname in directories:
+        navigate_directory_tree(size=size, rank=rank,
+                                 input_directory=os.path.join(input_directory, dirname),
+                                 output_directory=os.path.join(output_directory, dirname), window_t=window_t, min_f=min_f, max_f=max_f)
+
+    return 0
 
 
 
