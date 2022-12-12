@@ -12,6 +12,31 @@ max_f = 16000
 build_spectrogram_images_from_audio_file(inputpath,outputpath,10,0,16000)
 ```
 
+## Generating images of spectrograms from files in directory tree
+
+We can run it from a jupyter-notebook on one CPU by means of the following commands
+
+```
+Arguments = namedtuple('Arguments', ['input_directory',
+                                     'output_directory',
+                                     'window_t',
+                                     'min_f',
+                                     'max_f'
+                                    ])
+
+args = Arguments(input_directory = '/media/dario/T7_Touch/Test_folder/',
+                 output_directory = '/media/dario/T7_Touch/Test_folder1/',
+                 window_t = 10,
+                 min_f = 0.0,
+                 max_f = 20000.0
+                )
+
+build_spectrogram_images_from_directory_tree.main(args)
+```
+or from the command line using `mpi4py` by means of the following command on many CPUs
+
+`mpiexec -n number of ranks python build_spectrogram_images_from_directory_tree.py --input_directory /the/input/directory/ --output_directory /the/output/directory/ --window_t temporal window of the spectrograms --min_f minimum frequency --max_f maximum frequency`
+
 ## Joint Embedding Training on shared memory
 
 The following command runs a training instance on a shared memory system on a single GPU.
