@@ -24,8 +24,8 @@ Arguments = namedtuple('Arguments', ['input_directory',
                                      'max_f'
                                     ])
 
-args = Arguments(input_directory = '/media/dario/T7_Touch/Test_folder/',
-                 output_directory = '/media/dario/T7_Touch/Test_folder1/',
+args = Arguments(input_directory = '/the/input/directory/',
+                 output_directory = '/the/output/directory/',
                  window_t = 10,
                  min_f = 0.0,
                  max_f = 20000.0
