@@ -37,6 +37,29 @@ or from the command line using `mpi4py` by means of the following command on man
 
 `mpiexec -n number of ranks python build_spectrogram_images_from_directory_tree.py --input_directory /the/input/directory/ --output_directory /the/output/directory/ --window_t temporal window of the spectrograms --min_f minimum frequency --max_f maximum frequency`
 
+or on a node in a cluster using 4 CPUs, you first submit your job in a queue
+
+`qsub -n 1 -q single-gpu -t 10 -A MyProjectName ./my_script_to_run.sh`
+
+where `my_script_to_run.sh` is
+
+
+```
+#!/bin/sh
+ 
+# Common paths
+singularity_image_path='/path/to/singularity/image.sif'
+sound_analysis_path='/sound/analysius/path'
+spectrogram_builder_script_path='/path/to/Soundscape_analysis/build_spectrogram_images_from_directory_tree.py'
+input_directory='/input/directory/fo/the/audio/files'
+output_path='/output/directory/for/the/spectrogram/images'
+
+cd $sound_analysis_path
+singularity exec --nv -B $input_directory:/Audio_files,$output_path:/Outputs $singularity_image_path mpiexec -n 4 python $spectrogram_builder_script_path --input_directory /Audio_files --output_directory /Outputs --window_t time window --min_f minimum frequency --max_f maximum frequency
+
+```
+
+
 ## Joint Embedding Training on shared memory
 
 The following command runs a training instance on a shared memory system on a single GPU.
