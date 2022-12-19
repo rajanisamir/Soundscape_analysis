@@ -12,7 +12,7 @@ max_f = 16000
 build_spectrogram_images_from_audio_file(inputpath,outputpath,10,0,16000)
 ```
 
-## Generating images of spectrograms from files in directory tree
+## Generating images of spectrograms from audio files in directory tree
 
 We can run it from a jupyter-notebook on one CPU by means of the following commands
 
@@ -59,6 +59,9 @@ singularity exec --nv -B $input_directory:/Audio_files,$output_path:/Outputs $si
 
 ```
 
+Each rank will process specific files (depending on its rank number) inside a directory tree and will eventually write a `.txt` file as a checkpoint indicating that all files assigned to such a rank have already been processed in such a directory.
+If the run has to be re-started the rank will try to read the checkpoint files in order to avoid starting from scratch.
+If the rank finds a checkpoint file corresponding to its rank numer in a directory, that means that all the audio files have already been processed by such a rank in that directory. Therefore such a rank will jump the processing of such audio files.
 
 ## Joint Embedding Training on shared memory
 
