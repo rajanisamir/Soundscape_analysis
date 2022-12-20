@@ -25,6 +25,9 @@ def get_spectrograms_from_file(path, window, min_freq, max_freq):
         
     spectrograms = np.array(spectrograms)
 
+    # here I am catching an error when the loaded audio file is corrupted
+    if 'tn' not in locals() or 'fn' not in locals() or 'ext' not in locals():
+        print('XXXXXXXXXXXXX>>>>>>>>>>>>> SOMETHING SEEMS TO BE WRONG WITH THE INPUT FILE HERE: ', path)
 
     return spectrograms, slices, tn, fn, ext
 
@@ -158,25 +161,43 @@ def navigate_directory_tree(size, rank, input_directory, output_directory, windo
     """
     Build and save spectrogram images built from audio files from directory trees
     """
-    # iterate over files in
-    # that input_directory
-    files = [f for f in os.listdir(input_directory) if os.path.isfile(os.path.join(input_directory, f))]
-    directories = [d for d in os.listdir(input_directory) if os.path.isdir(os.path.join(input_directory, d))]
-    counter = 0
-    for filename in files:
-        if counter % size == rank:
-            print('From rank ', rank, ' From ', os.path.join(input_directory, filename))
-            print('From rank ', rank, ' To ', output_directory)
-            build_spectrogram_images_from_audio_file(os.path.join(input_directory, filename), output_directory, window_t, min_f, max_f)
+    checkpoint_file_name = os.path.join(output_directory, 'Checkpoint_rank_' + str(rank) + '.txt')
+    if not os.path.isfile(checkpoint_file_name):
+        # iterate over files in
+        # that input_directory
+        # and then over subdirectories recursively
+        files = [f for f in os.listdir(input_directory) if os.path.isfile(os.path.join(input_directory, f))]
+        directories = [d for d in os.listdir(input_directory) if os.path.isdir(os.path.join(input_directory, d))]
+        counter = 0
+        for filename in files:
+            if counter % size == rank:
+                # print('From rank ', rank, ' From ', os.path.join(input_directory, filename))
+                # print('From rank ', rank, ' To ', output_directory)
+                build_spectrogram_images_from_audio_file(os.path.join(input_directory, filename), output_directory, window_t, min_f, max_f)
 
-        counter = counter + 1
+            counter = counter + 1
 
-    for dirname in directories:
-        navigate_directory_tree(size=size, rank=rank,
-                                 input_directory=os.path.join(input_directory, dirname),
-                                 output_directory=os.path.join(output_directory, dirname), window_t=window_t, min_f=min_f, max_f=max_f)
+        for dirname in directories:
+            navigate_directory_tree(size=size, rank=rank,
+                                    input_directory=os.path.join(input_directory, dirname),
+                                    output_directory=os.path.join(output_directory, dirname), window_t=window_t, min_f=min_f, max_f=max_f)
 
-    return 0
+        os.makedirs(os.path.dirname(checkpoint_file_name), exist_ok=True)
+        with open(checkpoint_file_name, 'w') as f:
+            f.write('Files in this directory were completed for rank ' + str(rank))
+            f.close()
+
+        print('------>>>>>>> Checkpoint completed for directory: ' + output_directory + ' for rank ' + str(rank))
+    else:
+        print('------>>>>>>> Checkpoint already completed for directory: ' + output_directory + ' for rank ' + str(rank))
+
+
+
+
+
+
+
+
 
 
 

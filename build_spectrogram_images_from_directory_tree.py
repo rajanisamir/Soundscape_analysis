@@ -3,6 +3,9 @@ import argparse
 from mpi4py import MPI
 from audio_utilities import navigate_directory_tree
 
+
+
+
 def get_args_parser():
     parser = argparse.ArgumentParser('Spectrograms_from_dir', add_help=False)
 
@@ -37,6 +40,15 @@ def main(args):
                                                   output_directory=args.output_directory,
                                                   window_t=args.window_t,
                                                   min_f=args.min_f, max_f=args.max_f)
+
+    comm.Barrier()
+    if rank == 0:
+        print('Task finished. Please review the output in case of any corrupted audio file.')
+        print('The message for corrupted files is the following:')
+        print('XXXXXXXXXXXXX>>>>>>>>>>>>> SOMETHING SEEMS TO BE WRONG WITH THE INPUT FILE HERE:  /and/this/is/the/path/to/the/file.wav')
+        print('Please, put the file in quarentine and re-run again sice such error kill the rank reading such a file.')
+        print('After you finish the task delete all txt files in the output directory tree since they were used for checkpointing')
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('Spectrograms_from_dir', parents=[get_args_parser()])
