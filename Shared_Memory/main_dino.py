@@ -304,6 +304,7 @@ def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss, data_loade
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Epoch: [{}/{}]'.format(epoch, args.epochs)
     for it, (images, _) in enumerate(metric_logger.log_every(data_loader, 10, header)):
+        #print(images[0].shape)
         # update weight decay and learning rate according to their schedule
         it = len(data_loader) * epoch + it  # global training iteration
         for i, param_group in enumerate(optimizer.param_groups):
@@ -419,12 +420,13 @@ class DINOLoss(nn.Module):
 class DataAugmentationDINO(object):
     def __init__(self, global_crops_scale, local_crops_scale, local_crops_number):
         flip_and_color_jitter = transforms.Compose([
+            transforms.Grayscale(num_output_channels=1),
             transforms.RandomHorizontalFlip(p=0.5),
             #transforms.RandomApply(
                 #[transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.2, hue=0.1)],
                 #p=0.8
             #),
-            transforms.RandomGrayscale(p=0.2),
+            #transforms.RandomGrayscale(p=0.2),
         ])
         normalize = transforms.Compose([
             transforms.ToTensor(),
