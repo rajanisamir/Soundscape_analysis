@@ -95,3 +95,27 @@ where `my_script_to_run.sh` is
  14 
  
 ```
+
+## Joint Embedding Inference on shared memory
+
+The following command runs an inference instance on a shared memory system on a single GPU.
+This is generally used in a local machine
+
+
+`python -m torch.distributed.launch --nproc_per_node=1 inference_dino.py --arch vit_small --data_path /path/to/your/images/ --dump_features /path/where/the/features/will/be/dumpped/ --pretrained_weights /path/to/the/pretrained/weights/checkpoint.pth --batch_size_per_gpu some integer --image_size 512 512 --inference_up_to 1000`
+
+After running this command the features will be saved in `--demp_features` path.
+The features are composed by 3 files:
+
+```
+att_map.pth
+feat.pth
+file_name.pth
+```
+
+- `att_map.pth` contains all the attentional maps corresponding to each image.
+- `feat.pth` contains an output feature vector from DINO per input image.
+- `file_name.pth` contains an array with information about the input file names.
+
+
+
