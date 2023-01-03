@@ -4,6 +4,7 @@ import argparse
 import datetime
 import time
 import re
+from pathlib import Path
 
 import numpy as np
 
@@ -17,7 +18,6 @@ from torchvision import models as torchvision_models
 
 import utils
 import vision_transformer as vits
-
 
 
 
@@ -83,7 +83,7 @@ def extract_feature_pipeline(args):
     start_time = time.time()
     # ============ extract features ... ============
     print("Extracting features ...")
-    features, file_names, attentional_maps = extract_features(model, data_loader, args.use_cuda)
+    features, file_names, file_paths, attentional_maps = extract_features(model, data_loader, args.use_cuda)
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
@@ -96,6 +96,7 @@ def extract_feature_pipeline(args):
     if args.dump_features and dist.get_rank() == 0:
         torch.save(features.cpu(), os.path.join(args.dump_features, "feat.pth"))
         torch.save(file_names.cpu(), os.path.join(args.dump_features, "file_name.pth"))
+        torch.save(file_paths.cpu(), os.path.join(args.dump_features, "file_path.pth"))
         torch.save(attentional_maps.cpu(), os.path.join(args.dump_features, "att_map.pth"))
         print(f"Features and attentional maps with their corresponding file names are saved in {args.dump_features}!")
     return features
@@ -109,6 +110,7 @@ def extract_features(model, data_loader, use_cuda=True):
     metric_logger = utils.MetricLogger(delimiter="  ")
     features = None
     file_names = None
+    file_paths = None
     attentional_maps = None
     if args.inference_up_to:
         cumulative_indexes = torch.zeros(len(data_loader.dataset), dtype=torch.bool)
@@ -134,6 +136,7 @@ def extract_features(model, data_loader, use_cuda=True):
 
         # get file names
         local_file_names = []
+        local_file_paths = []
         for i in range(args.batch_size_per_gpu):
             file_name = re.sub("[^0-9]", "", os.path.basename(path[i])[25:]).zfill(15)
             file_name = re.sub("[^0-9]", "", os.path.basename(path[i])[:25]) + file_name
@@ -143,12 +146,51 @@ def extract_features(model, data_loader, use_cuda=True):
             file_name = np.array(list(file_name), dtype=int)
             local_file_names.append(file_name)
 
+
+            p=Path(path[i])
+            file_path = ''
+            directory_depth = 4
+            for j in reversed(range(directory_depth)):
+                if j+1 == directory_depth:
+                    file_path = file_path + p.parts[-(j+1)]
+                else:
+                    file_path = file_path + '/' + p.parts[-(j+1)]
+
+            if 'justify_string' not in locals():
+                justify_string = len(file_path) + 20
+
+            if len(file_path) > justify_string:
+                raise RuntimeError('Incompatible path length, please increase "justify_string"')
+            else:
+                file_path = file_path.ljust(justify_string, '~')
+
+            #print(file_path)
+            file_path = np.array([ord(x) for x in file_path], dtype=int)
+            local_file_paths.append(file_path)
+            #print(file_path)
+
         local_file_names = np.array(local_file_names)
+        #print(local_file_names)
         local_file_names = torch.from_numpy(local_file_names).float()
 
         # move local file names to gpu
         local_file_names = local_file_names.cuda(non_blocking=True)
         #print('local_file_names shape is ', local_file_names.shape)
+
+
+
+
+        local_file_paths = np.array(local_file_paths)
+        #print(local_file_paths)
+        local_file_paths = torch.from_numpy(local_file_paths).float()
+
+        # move local file names to gpu
+        local_file_paths = local_file_paths.cuda(non_blocking=True)
+        #print('local_file_paths shape is ', local_file_paths.shape)
+
+
+
+
 
         # forward pass
         feats = model(images).clone()
@@ -162,16 +204,19 @@ def extract_features(model, data_loader, use_cuda=True):
         #print('attentions shape is ', local_attentional_maps.shape)
 
         # init storage feature matrix
-        if dist.get_rank() == 0 and features is None and file_names is None and attentional_maps is None:
+        if dist.get_rank() == 0 and features is None and file_names is None and file_paths is None and attentional_maps is None:
             features = torch.zeros(len(data_loader.dataset), feats.shape[-1])
             file_names = torch.zeros(len(data_loader.dataset), local_file_names.shape[-1])
+            file_paths = torch.zeros(len(data_loader.dataset), local_file_paths.shape[-1])
             attentional_maps = torch.zeros(len(data_loader.dataset), local_attentional_maps.shape[-1])
             if use_cuda:
                 features = features.cuda(non_blocking=True)
                 file_names = file_names.cuda(non_blocking=True)
+                file_paths = file_paths.cuda(non_blocking=True)
                 attentional_maps = attentional_maps.cuda(non_blocking=True)
             print(f"Storing features into tensor of shape {features.shape}")
             print(f"Storing file names into tensor of shape {file_names.shape}")
+            print(f"Storing file paths into tensor of shape {file_paths.shape}")
             print(f"Storing attentional maps into tensor of shape {attentional_maps.shape}")
 
         # get indexes from all processes
@@ -209,6 +254,18 @@ def extract_features(model, data_loader, use_cuda=True):
         file_names_output_all_reduce = torch.distributed.all_gather(file_names_output_l, local_file_names, async_op=True)
         file_names_output_all_reduce.wait()
 
+        # share file paths between processes
+        file_paths_all = torch.empty(
+                dist.get_world_size(),
+                local_file_paths.size(0),
+                local_file_paths.size(1),
+                dtype=local_file_paths.dtype,
+                device=local_file_paths.device,
+                )
+        file_paths_output_l = list(file_paths_all.unbind(0))
+        file_paths_output_all_reduce = torch.distributed.all_gather(file_paths_output_l, local_file_paths, async_op=True)
+        file_paths_output_all_reduce.wait()
+
         # share features between processes
         feats_all = torch.empty(
             dist.get_world_size(),
@@ -226,18 +283,21 @@ def extract_features(model, data_loader, use_cuda=True):
             if use_cuda:
                 features.index_copy_(0, index_all, torch.cat(output_l))
                 file_names.index_copy_(0, index_all, torch.cat(file_names_output_l))
+                file_paths.index_copy_(0, index_all, torch.cat(file_paths_output_l))
                 attentional_maps.index_copy_(0, index_all, torch.cat(attentional_maps_output_l))
             else:
                 features.index_copy_(0, index_all.cpu(), torch.cat(output_l).cpu())
                 file_names.index_copy_(0, index_all.cpu(), torch.cat(file_names_output_l).cpu())
+                file_paths.index_copy_(0, index_all.cpu(), torch.cat(file_paths_output_l).cpu())
                 attentional_maps.index_copy_(0, index_all.cpu(), torch.cat(attentional_maps_output_l).cpu())
 
     if args.inference_up_to:
         features = features[cumulative_indexes]
         file_names = file_names[cumulative_indexes]
+        file_paths = file_paths[cumulative_indexes]
         attentional_maps = attentional_maps[cumulative_indexes]
 
-    return features, file_names, attentional_maps
+    return features, file_names, file_paths, attentional_maps
 
 class ReturnIndexDataset(ImageFolderWithPaths):
     def __getitem__(self, idx):
