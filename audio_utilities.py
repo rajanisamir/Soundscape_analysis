@@ -141,7 +141,8 @@ def build_spectrogram_images_from_audio_file(audiofilepath, outputdirpath, windo
     """
 
     spectrograms, slices, tn, fn, ext = get_spectrograms_from_file(audiofilepath, window_t, min_f, max_f)
-    figures = get_figures_from_spectrograms(spectrograms, ext)
+    images = get_images_from_spectrograms(spectrograms, ext)
+    #figures = get_figures_from_spectrograms(spectrograms, ext)
 
     CHECK_FOLDER = os.path.isdir(outputdirpath)
 
@@ -149,8 +150,9 @@ def build_spectrogram_images_from_audio_file(audiofilepath, outputdirpath, windo
     if not CHECK_FOLDER:
         Path(outputdirpath).mkdir(parents=True, exist_ok=True)
 
-    save_figures(outputdirpath, Path(audiofilepath).stem, figures)
-    reformat_all_files_in_dir(outputdirpath, Path(audiofilepath).stem, 'png')
+    save_images(outputdirpath, Path(audiofilepath).stem, images)
+    #save_figures(outputdirpath, Path(audiofilepath).stem, figures)
+    #reformat_all_files_in_dir(outputdirpath, Path(audiofilepath).stem, 'png')
 
 
 
@@ -199,5 +201,89 @@ def navigate_directory_tree(size, rank, input_directory, output_directory, windo
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def get_image_from_spectrogram(Sxx, extent, db_range=96, gain=0, log_scale=True,
+                               interpolation='bilinear', **kwargs):
+    """
+    Build spectrogram representation and return an image.
+    
+    Parameters
+    ----------
+    Sxx : 2d ndarray
+        Spectrogram computed using `maad.sound.spectrogram`.
+    extent : list of scalars [left, right, bottom, top]
+        Location, in data-coordinates, of the lower-left and upper-right corners.
+    db_range : int or float, optional
+        Range of values to display the spectrogram. The default is 96.
+    gain : int or float, optional
+        Gain in decibels added to the signal for display. The default is 0.
+    **kwargs : matplotlib image properties
+            Other keyword arguments that are passed down to matplotlib.axes.
+
+    Plot the spectrogram of an audio.
+    
+    """
+    # convert Sxx into dB with values between 0 to 96dB corresponding to a 16 bits soundwave
+    Sxx_dB = util.power2dB(Sxx, db_range, gain) + 96
+
+    # OPTIONAL : rescale the values between 0 to 255 (8 bits) depending on the min and max threshold values 
+    min_threshold = 0
+    max_threshold = 50 # value in dB from 0dB (the image will be white) to 96dB (the highest range possible)
+    Sxx_dB = Sxx_dB - min_threshold
+    Sxx_dB = (Sxx_dB/max_threshold)*255
+
+    # create a object image
+    spectro_image = Image.fromarray(Sxx_dB)
+    # rotate the image in orde to have the lowest frequency at the bottom of the image
+    spectro_image = spectro_image.transpose(Image.FLIP_TOP_BOTTOM)
+    #spectro_image = spectro_image.rotate(180)
+    # convert into greyscale (8 bits : 0-255)
+    spectro_image = spectro_image.convert("L")
+
+    return spectro_image
+
+
+
+def save_images(path, file_name, images):
+    counter=0
+    for image in images:
+        aux = os.path.join(path, file_name+'_'+str(counter)+'.png')
+        image.save(aux)
+
+        counter = counter+1
+
+
+def get_images_from_spectrograms(spectrograms, extent):
+    images = []
+    for spectrogram in spectrograms:
+        images.append(get_image_from_spectrogram(spectrogram, extent))
+
+    return images
 
 
