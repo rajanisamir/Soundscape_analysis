@@ -17,6 +17,7 @@ def get_args_parser():
     parser.add_argument('--window_t', default=10, type=int, help='Number of seconds of the temporal window in the spectrograms.')
     parser.add_argument("--min_f", default=0.0, type=float, help="""Minimum frequency of the spectrograms.""")
     parser.add_argument("--max_f", default=20000.0, type=float, help="""Maximum frequency of the spectrograms.""")
+    parser.add_argument("--mel", action='store_true', help="""Generate MEL spectrograms.""")
 
     return parser
 
@@ -36,10 +37,14 @@ def main(args):
     if args.max_f==None:
         args.max_f=20000
 
+    if args.mel==None:
+        args.mel=False
+
     navigate_directory_tree(size=size, rank=rank, input_directory=args.input_directory,
                                                   output_directory=args.output_directory,
                                                   window_t=args.window_t,
-                                                  min_f=args.min_f, max_f=args.max_f)
+                                                  min_f=args.min_f, max_f=args.max_f,
+                                                  mel=args.mel)
 
     comm.Barrier()
     if rank == 0:

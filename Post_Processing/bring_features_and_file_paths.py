@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import datetime
 
+np.random.seed(seed=10)
 
 # Brings the feature vectors from a file if features_path is a file path
 # If features_path is a folder, iterates thorught one level internal folders
@@ -68,7 +69,8 @@ def get_spectrogram_time_mark_in_file(spectrogram_path, spectrogram_duration):
     return int(file[25:])*spectrogram_duration
 
 def get_BirdNET_detections(fpath, spectrogram_interval, confidence_threshold=0.0):
-    auxiliary = os.path.basename(fpath)
+    dpath, auxiliary = os.path.split(fpath)
+
     year = int(auxiliary[:4])
     month = int(auxiliary[4:6])
     day = int(auxiliary[6:8])
@@ -88,6 +90,8 @@ def get_BirdNET_detections(fpath, spectrogram_interval, confidence_threshold=0.0
     week = datetime.date(year, month, day).isocalendar()[1]
     weekday = datetime.date(year, month, day).isocalendar()[2]
 
+    device = dpath.split('/')[-2]
+    SET = dpath.split('/')[-3]
 
     try:
         with open(fpath) as f:
@@ -96,7 +100,7 @@ def get_BirdNET_detections(fpath, spectrogram_interval, confidence_threshold=0.0
         data = []
         detection = 'No detection'
         confidence = 1.0
-        data.append({'detection': detection, 'confidence': confidence, 'year': year, 'month': month, 'day': day, 'hour': hour, 'minute': minute, 'second': second, 'week': week, 'weekday': weekday})
+        data.append({'detection': detection, 'confidence': confidence, 'year': year, 'month': month, 'day': day, 'hour': hour, 'minute': minute, 'second': second, 'week': week, 'weekday': weekday, 'device': device, 'set': SET})
         return data
 
 
@@ -109,12 +113,12 @@ def get_BirdNET_detections(fpath, spectrogram_interval, confidence_threshold=0.0
             detection = ' '.join(line.split()[10:-2])
             confidence = float(line.split()[-2])
             if confidence > confidence_threshold:
-                data.append({'detection': detection, 'confidence': confidence, 'year': year, 'month': month, 'day': day, 'hour': hour, 'minute': minute, 'second': second, 'week': week, 'weekday': weekday})
+                data.append({'detection': detection, 'confidence': confidence, 'year': year, 'month': month, 'day': day, 'hour': hour, 'minute': minute, 'second': second, 'week': week, 'weekday': weekday, 'device': device, 'set': SET})
 
     if len(data) == 0:
         detection = 'No detection'
         confidence = 1.0
-        data.append({'detection': detection, 'confidence': confidence, 'year': year, 'month': month, 'day': day, 'hour': hour, 'minute': minute, 'second': second, 'week': week, 'weekday': weekday})
+        data.append({'detection': detection, 'confidence': confidence, 'year': year, 'month': month, 'day': day, 'hour': hour, 'minute': minute, 'second': second, 'week': week, 'weekday': weekday, 'device': device, 'set': SET})
 
     return data
 

@@ -172,6 +172,8 @@ def main(args):
 
     # make the image divisible by the patch size
     #img = pth_transforms.functional.crop(img,500,0,500,1024)
+    # img = pth_transforms.functional.crop(img,550,0,200,1548)
+
     w, h = img.shape[1] - img.shape[1] % args.patch_size, img.shape[2] - img.shape[2] % args.patch_size
     img = img[:, :w, :h].unsqueeze(0)
 

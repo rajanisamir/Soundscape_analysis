@@ -125,6 +125,7 @@ def extract_features(model, data_loader, use_cuda=True):
         images = images.cuda(non_blocking=True)
 
         #images = pth_transforms.functional.crop(images,500,0,500,1024)
+        # images = pth_transforms.functional.crop(images,550,0,200,1548)
         # make the image divisible by the patch size
         w, h = images.shape[-2] - images.shape[-2] % args.patch_size, images.shape[-1] - images.shape[-1] % args.patch_size
         images = images[:, :, :w, :h]
@@ -138,29 +139,42 @@ def extract_features(model, data_loader, use_cuda=True):
         local_file_names = []
         local_file_paths = []
         for i in range(args.batch_size_per_gpu):
-            file_name = re.sub("[^0-9]", "", os.path.basename(path[i])[25:]).zfill(15)
-            file_name = re.sub("[^0-9]", "", os.path.basename(path[i])[:25]) + file_name
+            # file_name = re.sub("[^0-9]", "", os.path.basename(path[i])[25:]).zfill(15)
+            # file_name = re.sub("[^0-9]", "", os.path.basename(path[i])[:25]) + file_name
             # file_name = re.sub("[^0-9]", "", os.path.basename(path[i])[19:]).zfill(5) 
             # file_name = re.sub("[^0-9]", "", os.path.basename(path[i])[:19]) + file_name
             # file_name = re.sub("[^0-9]", "", os.path.basename(path[i]))
-            file_name = np.array(list(file_name), dtype=int)
+            # file_name = np.array(list(file_name), dtype=int)
+            file_name = os.path.basename(path[i]).zfill(15)
+            file_name = np.array([ord(x) for x in file_name], dtype=int)
             local_file_names.append(file_name)
 
 
             p=Path(path[i])
             file_path = ''
-            directory_depth = 4
-            for j in reversed(range(directory_depth)):
-                if j+1 == directory_depth:
+            for j in reversed(range(args.directory_depth)):
+                if j+1 == args.directory_depth:
                     file_path = file_path + p.parts[-(j+1)]
                 else:
                     file_path = file_path + '/' + p.parts[-(j+1)]
 
             if 'justify_string' not in locals():
-                justify_string = len(file_path) + 20
+                if dist.get_rank() == 0:
+                    justify_string = torch.tensor(len(file_path) + 20)
+                    justify_string = justify_string.cuda(non_blocking=True)
+                    torch.distributed.broadcast(justify_string, src=0, async_op=False)
+                    justify_string = justify_string.item()
+                else:
+                    justify_string = torch.tensor(0)
+                    justify_string = justify_string.cuda(non_blocking=True)
+                    torch.distributed.broadcast(justify_string, src=0, async_op=False)
+                    justify_string = justify_string.item()
 
+
+
+            # print('justify_string: ', justify_string, ' len(file_path)', len(file_path), ' in rank ', dist.get_rank())
             if len(file_path) > justify_string:
-                raise RuntimeError('Incompatible path length, please increase "justify_string"')
+                raise RuntimeError('Incompatible path length, please increase "justify_string"', 'justify_string: ', justify_string, ' len(file_path)', len(file_path), ' in rank ', dist.get_rank())
             else:
                 file_path = file_path.ljust(justify_string, '~')
 
@@ -325,6 +339,7 @@ if __name__ == '__main__':
     parser.add_argument("--local_rank", default=0, type=int, help="Please ignore and do not set this argument.")
     parser.add_argument('--data_path', default='/path/to/sky_images/', type=str)
     parser.add_argument('--inference_up_to', default=None, type=int, help='Inference up to n samples from the complete dataset')
+    parser.add_argument("--directory_depth", default=4, type=int, help="This is the depth with which you want to spedify the file paths.")
     args = parser.parse_args()
 
     utils.init_distributed_mode(args)
