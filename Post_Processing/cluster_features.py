@@ -31,6 +31,8 @@ from joblib import dump, load
 def get_args_parser():
     parser = argparse.ArgumentParser('Features post processing using dimensionality reduction and clustering', add_help=False)
     parser.add_argument('--features_path', default='', type=str, help="Path to the features to be processed.")
+    parser.add_argument('--exclude_indices_path', default=None, type=str, help="Path to the indices to exclude from clustering.")
+    parser.add_argument('--include_indices_path', default=None, type=str, help="Path to the indices to include in clustering.")
 
     # For the dim red method
     parser.add_argument('--dimensions', default=2, type=int, help='Reduce to this number of dimensions (Default 2).')
@@ -53,7 +55,6 @@ def get_args_parser():
     parser.add_argument('--subsample_feats', default=None, type=int, help='Subsample the feature space to a reduce number of samples.')
 
     return parser
-
 
 
 
@@ -99,11 +100,23 @@ def bring_features(args):
         return 1
 
 
-    print('We have {} feature vectors.' .format(feats.shape[0]))
+    print('We have {} feature vectors before removing indices' .format(feats.shape[0]))
+    original_feats = feats.shape[0]
+    
+    if os.path.isfile(args.include_indices_path):
+        include_indices = torch.load(args.include_indices_path)
+        feats = feats[include_indices]
+    elif os.path.isfile(args.exclude_indices_path):
+        exclude_indices = set(torch.load(args.exclude_indices_path))
+        include_indices = [i for i in range(len(feats)) if i not in exclude_indices]
+        feats = feats[include_indices]
+        
+    print('We have {} feature vectors after removing indices' .format(feats.shape[0]))
+        
     if args.subsample_feats:
         assert args.subsample_feats > 0.0 and args.subsample_feats < 1.0
         print('Sub-sampling to {} %.' .format(args.subsample_feats*100))
-        feats = choose_random_rows(feats, int(args.subsample_feats*feats.shape[0]))
+        feats = choose_random_rows(feats, int(args.subsample_feats*original_feats))
         print('We ended up with {} feature vectors.' .format(feats.shape[0]))
 
     scale = StandardScaler()
