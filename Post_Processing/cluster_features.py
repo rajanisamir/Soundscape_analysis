@@ -103,10 +103,14 @@ def bring_features(args):
     print('We have {} feature vectors before removing indices' .format(feats.shape[0]))
     original_feats = feats.shape[0]
     
-    if os.path.isfile(args.include_indices_path):
+    if args.include_indices_path:
+        if not os.path.isfile(args.include_indices_path):
+            raise ValueError(f"Invalid file name: {args.include_indices_path}.")
         include_indices = torch.load(args.include_indices_path)
         feats = feats[include_indices]
-    elif os.path.isfile(args.exclude_indices_path):
+    elif args.exclude_indices_path:
+        if not os.path.isfile(args.exclude_indices_path):
+            raise ValueError(f"Invalid file name: {args.exclude_indices_path}.")
         exclude_indices = set(torch.load(args.exclude_indices_path))
         include_indices = [i for i in range(len(feats)) if i not in exclude_indices]
         feats = feats[include_indices]

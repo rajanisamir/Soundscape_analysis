@@ -155,7 +155,7 @@ def extract_features(model, data_loader, use_cuda=True):
 
             if "justify_string" not in locals():
                 if dist.get_rank() == 0:
-                    justify_string = torch.tensor(len(file_path) + 20)
+                    justify_string = torch.tensor(len(file_path) + 40)
                     justify_string = justify_string.cuda(non_blocking=True)
                     torch.distributed.broadcast(justify_string, src=0, async_op=False)
                     justify_string = justify_string.item()
