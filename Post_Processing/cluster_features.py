@@ -116,6 +116,7 @@ def bring_features(args):
         feats = feats[include_indices]
         
     print('We have {} feature vectors after removing indices' .format(feats.shape[0]))
+    original_feats = feats.shape[0]
         
     if args.subsample_feats:
         assert args.subsample_feats > 0.0 and args.subsample_feats < 1.0
